@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · BOOKFOIL{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">Your library</h1>
+  <span class="text-muted">Today: {{ today }}</span>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card p-3 text-center">
+      <div class="h2 mb-0">{{ book_count }}</div>
+      <div class="text-muted small">Books</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card p-3 text-center">
+      <div class="h2 mb-0">{{ shelf_count }}</div>
+      <div class="text-muted small">Shelves</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card p-3 text-center">
+      <div class="h2 mb-0">{{ active_borrows|length }}</div>
+      <div class="text-muted small">Books lent out</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card p-3 text-center">
+      <div class="h2 mb-0">{{ wishlist_open }}</div>
+      <div class="text-muted small">Wishlist items</div>
+    </div>
+  </div>
+</div>
+
+{% if released_count %}
+<div class="mb-4">
+  <a href="{% url 'library:book_archive' %}" class="text-decoration-none">
+    <div class="card p-3">
+      <span>📤 {{ released_count }} book(s) released (donated/gifted/…) —
+        view history &rarr;</span>
+    </div>
+  </a>
+</div>
+{% endif %}
+
+{% if overdue %}
+<div class="card mb-4 border-danger">
+  <div class="card-header bg-danger text-white">
+    ⏰ Overdue — ask for these back!
+  </div>
+  <ul class="list-group list-group-flush">
+    {% for b in overdue %}
+      <li class="list-group-item d-flex justify-content-between align-items-center">
+        <span>
+          <a href="{% url 'library:book_detail' b.book.pk %}">{{ b.book.title }}</a>
+          — lent to <strong>{{ b.borrower_name }}</strong>
+          {% if b.borrower_contact %}
+            <span class="text-muted">({{ b.borrower_contact }})</span>
+          {% endif %}
+        </span>
+        <span class="badge bg-danger">
+          {{ b.days_until_due|stringformat:"d" }} days overdue · due {{ b.due_on }}
+        </span>
+      </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{% if due_soon %}
+<div class="card mb-4 border-warning">
+  <div class="card-header bg-warning">🔔 Due within 7 days</div>
+  <ul class="list-group list-group-flush">
+    {% for b in due_soon %}
+      <li class="list-group-item d-flex justify-content-between">
+        <span>
+          <a href="{% url 'library:book_detail' b.book.pk %}">{{ b.book.title }}</a>
+          — {{ b.borrower_name }}
+        </span>
+        <span class="badge bg-warning text-dark">due {{ b.due_on }}</span>
+      </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-header">📖 Currently reading</div>
+  <div class="card-body">
+    {% for book in reading %}
+      <div class="mb-3">
+        <div class="d-flex justify-content-between">
+          <a href="{% url 'library:book_detail' book.pk %}">{{ book.title }}</a>
+          {% if book.reading_progress is not None %}
+            <span class="text-muted small">{{ book.reading_progress }}%</span>
+          {% endif %}
+        </div>
+        {% if book.reading_progress is not None %}
+          <div class="progress">
+            <div class="progress-bar" style="width: {{ book.reading_progress }}%"></div>
+          </div>
+        {% endif %}
+      </div>
+    {% empty %}
+      <p class="text-muted mb-0">Nothing in progress. Open a book and set a bookmark to start tracking.</p>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

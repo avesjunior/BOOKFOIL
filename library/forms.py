@@ -137,3 +137,37 @@ class WishlistItemForm(_BootstrapMixin, forms.ModelForm):
             "notes",
         ]
         widgets = {"notes": forms.Textarea(attrs={"rows": 2})}
+
+
+class ReleaseBookForm(_BootstrapMixin, forms.ModelForm):
+    """
+    Record a book's destination when it leaves the collection
+    (donated, gifted, sold, lost, etc.). The book is kept for history.
+    """
+
+    class Meta:
+        model = Book
+        fields = [
+            "destination",
+            "destination_detail",
+            "released_on",
+            "destination_note",
+        ]
+        widgets = {
+            "released_on": forms.DateInput(attrs={"type": "date"}),
+            "destination_note": forms.Textarea(attrs={"rows": 2}),
+        }
+        labels = {
+            "destination_detail": "Recipient / where it went",
+            "destination_note": "Note",
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Require choosing a destination; default the date to today.
+        self.fields["destination"].required = True
+        self.fields["destination"].choices = [
+            ("", "— choose —")
+        ] + list(Book.Destination.choices)
+        if not self.instance.released_on:
+            self.fields["released_on"].initial = timezone.localdate()

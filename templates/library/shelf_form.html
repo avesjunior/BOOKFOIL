@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} · BOOKFOIL{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">{{ title }}</h1>
+<form method="post" novalidate class="card p-4" style="max-width:560px;">
+  {% csrf_token %}
+  <div class="mb-3">{{ form.name.label_tag }}{{ form.name }}{{ form.name.errors }}</div>
+  <div class="mb-3">{{ form.location.label_tag }}{{ form.location }}{{ form.location.errors }}</div>
+  <div class="mb-3">{{ form.notes.label_tag }}{{ form.notes }}{{ form.notes.errors }}</div>
+  <div>
+    <button class="btn btn-primary">Save</button>
+    <a class="btn btn-link" href="{% url 'library:shelf_list' %}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

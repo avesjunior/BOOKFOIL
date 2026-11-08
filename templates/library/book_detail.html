@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block title %}{{ book.title }} · BOOKFOIL{% endblock %}
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'library:book_list' %}">Books</a></li>
+    <li class="breadcrumb-item active">{{ book.title }}</li>
+  </ol>
+</nav>
+
+<div class="row g-4">
+  <div class="col-md-3">
+    {% if book.cover_url %}
+      <img src="{{ book.cover_url }}" class="img-fluid rounded shadow-sm" alt="">
+    {% else %}
+      <div class="bg-light rounded d-flex align-items-center justify-content-center" style="height:260px;">
+        <span class="text-muted">No cover</span>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="col-md-9">
+    <div class="d-flex justify-content-between align-items-start">
+      <div>
+        <h1 class="h3 mb-1">{{ book.title }}</h1>
+        <p class="text-muted">{{ book.author|default:"Unknown author" }}</p>
+      </div>
+      <div>
+        <a class="btn btn-sm btn-outline-secondary" href="{% url 'library:book_update' book.pk %}">Edit</a>
+        {% if book.is_active %}
+          <a class="btn btn-sm btn-outline-warning" href="{% url 'library:book_release' book.pk %}">Give away / release</a>
+        {% endif %}
+        <a class="btn btn-sm btn-outline-danger" href="{% url 'library:book_delete' book.pk %}">Delete</a>
+      </div>
+    </div>
+
+    {% if book.is_released %}
+      <div class="alert alert-secondary d-flex justify-content-between align-items-center mt-3 mb-0">
+        <span>
+          📤 This book left your collection:
+          <strong>{{ book.get_destination_display }}</strong>
+          {% if book.destination_detail %} — {{ book.destination_detail }}{% endif %}
+          {% if book.released_on %}<span class="text-muted">(on {{ book.released_on }})</span>{% endif %}
+          {% if book.was_read %}<span class="badge bg-success ms-1">already read</span>{% endif %}
+        </span>
+        <form method="post" action="{% url 'library:book_restore' book.pk %}" class="ms-3">
+          {% csrf_token %}
+          <button class="btn btn-sm btn-outline-primary">Restore to collection</button>
+        </form>
+      </div>
+      {% if book.destination_note %}
+        <p class="small text-muted mt-2 mb-0">{{ book.destination_note|linebreaksbr }}</p>
+      {% endif %}
+    {% endif %}
+
+    <div class="row g-3 mt-1">
+      <div class="col-sm-6">
+        <dl class="row mb-0 small">
+          <dt class="col-5">Format</dt>
+          <dd class="col-7">{{ book.get_book_format_display }}</dd>
+          {% if book.is_physical %}
+            <dt class="col-5">Shelf</dt>
+            <dd class="col-7">{{ book.shelf.name|default:"—" }}
+              {% if book.shelf.location %}<br><span class="text-muted">{{ book.shelf.location }}</span>{% endif %}
+            </dd>
+          {% else %}
+            <dt class="col-5">Device</dt>
+            <dd class="col-7">{{ book.digital_device|default:"—" }}</dd>
+            <dt class="col-5">Account</dt>
+            <dd class="col-7">{{ book.digital_account|default:"—" }}</dd>
+          {% endif %}
+          <dt class="col-5">Status</dt>
+          <dd class="col-7">{{ book.get_read_status_display }}</dd>
+        </dl>
+      </div>
+      <div class="col-sm-6">
+        <dl class="row mb-0 small">
+          <dt class="col-5">ISBN</dt><dd class="col-7">{{ book.isbn|default:"—" }}</dd>
+          <dt class="col-5">Publisher</dt><dd class="col-7">{{ book.publisher|default:"—" }}</dd>
+          <dt class="col-5">Year</dt><dd class="col-7">{{ book.published_year|default:"—" }}</dd>
+          <dt class="col-5">Pages</dt><dd class="col-7">{{ book.total_pages|default:"—" }}</dd>
+          <dt class="col-5">Genre</dt><dd class="col-7">{{ book.genre|default:"—" }}</dd>
+        </dl>
+      </div>
+    </div>
+
+    {% if book.notes %}
+      <div class="mt-3"><strong>Notes:</strong> <span class="text-muted">{{ book.notes|linebreaksbr }}</span></div>
+    {% endif %}
+  </div>
+</div>
+
+<hr class="my-4">
+
+<div class="row g-4">
+  <!-- Bookmark -->
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>🔖 Bookmark</span>
+        <a class="btn btn-sm btn-primary" href="{% url 'library:bookmark_edit' book.pk %}">
+          {% if bookmark %}Update{% else %}Set bookmark{% endif %}
+        </a>
+      </div>
+      <div class="card-body">
+        {% if bookmark %}
+          <p class="mb-1">You stopped on <strong>page {{ bookmark.current_page }}</strong>
+            {% if book.total_pages %} of {{ book.total_pages }}{% endif %}.</p>
+          {% if bookmark.percent is not None %}
+            <div class="progress mb-2"><div class="progress-bar" style="width: {{ bookmark.percent }}%"></div></div>
+            <small class="text-muted">{{ bookmark.percent }}% · updated {{ bookmark.updated_at|date:"M j, Y" }}</small>
+          {% endif %}
+          {% if bookmark.note %}<p class="mt-2 mb-0 text-muted">“{{ bookmark.note }}”</p>{% endif %}
+        {% else %}
+          <p class="text-muted mb-0">No bookmark yet. Set one to track where you stopped reading.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Borrowing -->
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>🤝 Lending</span>
+        {% if not active_borrow and book.is_active %}
+          <a class="btn btn-sm btn-primary" href="{% url 'library:borrow_create' book.pk %}">Lend this book</a>
+        {% endif %}
+      </div>
+      <div class="card-body">
+        {% if active_borrow %}
+          <p class="mb-1">Lent to <strong>{{ active_borrow.borrower_name }}</strong>
+            {% if active_borrow.borrower_contact %}<br><span class="text-muted">{{ active_borrow.borrower_contact }}</span>{% endif %}
+          </p>
+          <p class="mb-2">
+            Since {{ active_borrow.borrowed_on }} ·
+            {% if active_borrow.is_overdue %}
+              <span class="badge bg-danger">Overdue since {{ active_borrow.due_on }}</span>
+            {% else %}
+              <span class="badge bg-success">Due {{ active_borrow.due_on }}</span>
+            {% endif %}
+          </p>
+          <form method="post" action="{% url 'library:borrow_return' active_borrow.pk %}">
+            {% csrf_token %}
+            <button class="btn btn-sm btn-outline-success">Mark as returned</button>
+          </form>
+        {% else %}
+          <p class="text-muted mb-0">Not currently lent out.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if borrow_history %}
+<div class="card mt-4">
+  <div class="card-header">Lending history</div>
+  <div class="table-responsive">
+    <table class="table table-sm mb-0">
+      <thead class="table-light">
+        <tr><th>Borrower</th><th>Contact</th><th>Borrowed</th><th>Due</th><th>Returned</th></tr>
+      </thead>
+      <tbody>
+        {% for b in borrow_history %}
+          <tr>
+            <td>{{ b.borrower_name }}</td>
+            <td class="text-muted">{{ b.borrower_contact|default:"—" }}</td>
+            <td>{{ b.borrowed_on }}</td>
+            <td>{{ b.due_on }}</td>
+            <td>
+              {% if b.returned_on %}{{ b.returned_on }}
+              {% elif b.is_overdue %}<span class="badge bg-danger">overdue</span>
+              {% else %}<span class="badge bg-warning text-dark">out</span>{% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

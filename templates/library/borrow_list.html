@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Loans · BOOKFOIL{% endblock %}
+{% block content %}
+<h1 class="h3 mb-3">Loans &amp; reminders</h1>
+
+<ul class="nav nav-pills mb-3">
+  <li class="nav-item"><a class="nav-link {% if show == 'active' %}active{% endif %}" href="?show=active">Active</a></li>
+  <li class="nav-item"><a class="nav-link {% if show == 'overdue' %}active{% endif %}" href="?show=overdue">Overdue</a></li>
+  <li class="nav-item"><a class="nav-link {% if show == 'returned' %}active{% endif %}" href="?show=returned">Returned</a></li>
+  <li class="nav-item"><a class="nav-link {% if show == 'all' %}active{% endif %}" href="?show=all">All</a></li>
+</ul>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr><th>Book</th><th>Borrower</th><th>Contact</th><th>Borrowed</th><th>Due</th><th>Status</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for b in borrows %}
+          <tr>
+            <td><a href="{% url 'library:book_detail' b.book.pk %}">{{ b.book.title }}</a></td>
+            <td>{{ b.borrower_name }}</td>
+            <td class="text-muted">{{ b.borrower_contact|default:"—" }}</td>
+            <td>{{ b.borrowed_on }}</td>
+            <td>{{ b.due_on }}</td>
+            <td>
+              {% if b.is_returned %}
+                <span class="badge bg-secondary">Returned {{ b.returned_on }}</span>
+              {% elif b.is_overdue %}
+                <span class="badge bg-danger">Overdue</span>
+              {% else %}
+                <span class="badge bg-success">Out · due in {{ b.days_until_due }}d</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              {% if b.is_active %}
+                <form method="post" action="{% url 'library:borrow_return' b.pk %}">
+                  {% csrf_token %}
+                  <button class="btn btn-sm btn-outline-success">Mark returned</button>
+                </form>
+              {% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="7" class="text-center text-muted py-4">No loans to show.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

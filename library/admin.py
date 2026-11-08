@@ -35,10 +35,25 @@ class BookAdmin(admin.ModelAdmin):
         "book_format",
         "location_label",
         "read_status",
+        "status",
+        "destination",
         "is_borrowed_out",
     )
-    list_filter = ("book_format", "read_status", "shelf", "genre")
-    search_fields = ("title", "author", "isbn", "publisher")
+    list_filter = (
+        "status",
+        "destination",
+        "book_format",
+        "read_status",
+        "shelf",
+        "genre",
+    )
+    search_fields = (
+        "title",
+        "author",
+        "isbn",
+        "publisher",
+        "destination_detail",
+    )
     inlines = [BookmarkInline, BorrowInline]
 
 

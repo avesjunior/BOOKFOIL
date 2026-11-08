@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Confirm delete · BOOKFOIL{% endblock %}
+{% block content %}
+<div class="card p-4" style="max-width:520px;">
+  <h1 class="h5">Delete {{ object_label }}?</h1>
+  <p class="text-muted">This can't be undone.</p>
+  <form method="post">
+    {% csrf_token %}
+    <button class="btn btn-danger">Yes, delete</button>
+    <a class="btn btn-link" href="{{ cancel_url }}">Cancel</a>
+  </form>
+</div>
+{% endblock %}

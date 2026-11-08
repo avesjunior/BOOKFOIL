@@ -16,6 +16,19 @@ urlpatterns = [
     path("books/<int:pk>/edit/", views.book_update, name="book_update"),
     path("books/<int:pk>/delete/", views.book_delete, name="book_delete"),
 
+    # Destination / history
+    path("archive/", views.book_archive, name="book_archive"),
+    path(
+        "books/<int:pk>/release/",
+        views.book_release,
+        name="book_release",
+    ),
+    path(
+        "books/<int:pk>/restore/",
+        views.book_restore,
+        name="book_restore",
+    ),
+
     # Bookmark
     path(
         "books/<int:pk>/bookmark/",
