@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Lend · {{ book.title }}{% endblock %}
+{% block content %}
+<h1 class="h4 mb-1">🤝 Lend this book</h1>
+<p class="text-muted">{{ book.title }}</p>
+
+<form method="post" novalidate class="card p-4" style="max-width:620px;">
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+  <div class="row g-3">
+    <div class="col-md-6">{{ form.borrower_name.label_tag }}{{ form.borrower_name }}{{ form.borrower_name.errors }}</div>
+    <div class="col-md-6">{{ form.borrower_contact.label_tag }}{{ form.borrower_contact }}{{ form.borrower_contact.errors }}</div>
+    <div class="col-md-6">{{ form.borrowed_on.label_tag }}{{ form.borrowed_on }}{{ form.borrowed_on.errors }}</div>
+    <div class="col-md-6">{{ form.due_on.label_tag }}{{ form.due_on }}{{ form.due_on.errors }}
+      <div class="form-text">Return reminder/alarm fires from this date.</div></div>
+    <div class="col-12 form-check ms-2">
+      {{ form.reminder_enabled }} {{ form.reminder_enabled.label_tag }}
+    </div>
+    <div class="col-12">{{ form.notes.label_tag }}{{ form.notes }}{{ form.notes.errors }}</div>
+  </div>
+  <div class="mt-4">
+    <button class="btn btn-primary">Lend &amp; set reminder</button>
+    <a class="btn btn-link" href="{% url 'library:book_detail' book.pk %}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

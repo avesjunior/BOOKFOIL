@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}History · BOOKFOIL{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">History &amp; released books</h1>
+  <a class="btn btn-outline-secondary" href="{% url 'library:book_list' %}">← Back to collection</a>
+</div>
+
+<p class="text-muted">
+  Books that have left your collection — donated, gifted, sold, lost — kept
+  for the record. Use the filter to see the ones you had already read.
+</p>
+
+<form class="card p-3 mb-3" method="get">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-5">
+      <label class="form-label small mb-1">Search</label>
+      <input type="text" name="q" value="{{ q }}" class="form-control"
+             placeholder="title, author, ISBN, recipient">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small mb-1">Destination</label>
+      <select name="destination" class="form-select">
+        <option value="">Any</option>
+        {% for val, label in destinations %}
+          <option value="{{ val }}" {% if selected_destination == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2 form-check ms-2">
+      <input type="checkbox" class="form-check-input" id="read" name="read" value="1" {% if read_only %}checked{% endif %}>
+      <label class="form-check-label small" for="read">Only already read</label>
+    </div>
+    <div class="col-md-2 d-grid">
+      <button class="btn btn-outline-secondary">Filter</button>
+    </div>
+  </div>
+</form>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Title</th>
+          <th>Author</th>
+          <th>Destination</th>
+          <th>Recipient / where</th>
+          <th>Released</th>
+          <th>Read?</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for book in books %}
+          <tr>
+            <td><a href="{% url 'library:book_detail' book.pk %}">{{ book.title }}</a></td>
+            <td class="text-muted">{{ book.author|default:"—" }}</td>
+            <td><span class="badge bg-secondary">{{ book.get_destination_display|default:"Released" }}</span></td>
+            <td class="small">{{ book.destination_detail|default:"—" }}</td>
+            <td>{{ book.released_on|default:"—" }}</td>
+            <td>
+              {% if book.was_read %}
+                <span class="badge bg-success">Read</span>
+              {% else %}
+                <span class="text-muted small">{{ book.get_read_status_display }}</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              <form method="post" action="{% url 'library:book_restore' book.pk %}">
+                {% csrf_token %}
+                <button class="btn btn-sm btn-outline-primary">Restore</button>
+              </form>
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="7" class="text-center text-muted py-4">No released books yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

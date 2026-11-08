@@ -10,6 +10,7 @@ from .forms import (
     BookForm,
     BookmarkForm,
     BorrowForm,
+    ReleaseBookForm,
     ShelfForm,
     WishlistItemForm,
 )
@@ -31,15 +32,19 @@ def dashboard(request):
         b for b in active_borrows if 0 <= b.days_until_due <= 7
     ]
     context = {
-        "book_count": Book.objects.count(),
+        "book_count": Book.objects.filter(status=Book.Status.ACTIVE).count(),
         "shelf_count": Shelf.objects.count(),
         "reading": Book.objects.filter(
-            read_status=Book.ReadStatus.READING
+            status=Book.Status.ACTIVE,
+            read_status=Book.ReadStatus.READING,
         ).order_by("title"),
         "active_borrows": active_borrows,
         "overdue": overdue,
         "due_soon": due_soon,
         "wishlist_open": WishlistItem.objects.filter(acquired=False).count(),
+        "released_count": Book.objects.filter(
+            status=Book.Status.RELEASED
+        ).count(),
         "today": today,
     }
     return render(request, "library/dashboard.html", context)
@@ -49,7 +54,11 @@ def dashboard(request):
 # Book CRUD
 # --------------------------------------------------------------------------- #
 def book_list(request):
-    books = Book.objects.select_related("shelf").all()
+    # The main list shows books still in your collection. Released books
+    # (donated, gifted, etc.) move to the archive/history view.
+    books = Book.objects.select_related("shelf").filter(
+        status=Book.Status.ACTIVE
+    )
 
     query = request.GET.get("q", "").strip()
     fmt = request.GET.get("format", "").strip()
@@ -135,6 +144,100 @@ def book_delete(request, pk):
         "object_label": f"book “{book.title}”",
         "cancel_url": book.get_absolute_url(),
     })
+
+
+# --------------------------------------------------------------------------- #
+# Destination — release a book (donate/gift/…), archive & restore
+# --------------------------------------------------------------------------- #
+def book_release(request, pk):
+    """Record where a book went and move it out of the active collection."""
+    book = get_object_or_404(Book, pk=pk)
+
+    if book.is_released:
+        messages.info(request, f"“{book.title}” has already been released.")
+        return redirect(book.get_absolute_url())
+
+    if book.is_borrowed_out:
+        messages.warning(
+            request,
+            f"“{book.title}” is currently lent to "
+            f"{book.active_borrow.borrower_name}. Mark it returned before "
+            "releasing it.",
+        )
+        return redirect(book.get_absolute_url())
+
+    form = ReleaseBookForm(request.POST or None, instance=book)
+    if request.method == "POST" and form.is_valid():
+        book = form.save(commit=False)
+        book.status = Book.Status.RELEASED
+        book.save(
+            update_fields=[
+                "status",
+                "destination",
+                "destination_detail",
+                "released_on",
+                "destination_note",
+                "updated_at",
+            ]
+        )
+        messages.success(
+            request,
+            f"“{book.title}” was marked as "
+            f"{book.get_destination_display().lower()} and moved to your "
+            "history. It's kept for the record.",
+        )
+        return redirect(book.get_absolute_url())
+
+    return render(
+        request,
+        "library/book_release_form.html",
+        {"form": form, "book": book},
+    )
+
+
+def book_restore(request, pk):
+    """Bring a released book back into the active collection."""
+    book = get_object_or_404(Book, pk=pk)
+    if request.method == "POST":
+        book.restore()
+        messages.success(
+            request, f"“{book.title}” is back in your collection."
+        )
+    return redirect(book.get_absolute_url())
+
+
+def book_archive(request):
+    """History of books that have left the collection (incl. already read)."""
+    books = Book.objects.select_related("shelf").filter(
+        status=Book.Status.RELEASED
+    )
+
+    query = request.GET.get("q", "").strip()
+    destination = request.GET.get("destination", "").strip()
+    read_only = request.GET.get("read", "").strip()  # "1" => only finished
+
+    if query:
+        books = books.filter(
+            Q(title__icontains=query)
+            | Q(author__icontains=query)
+            | Q(isbn__icontains=query)
+            | Q(destination_detail__icontains=query)
+        )
+    if destination in dict(Book.Destination.choices):
+        books = books.filter(destination=destination)
+    if read_only == "1":
+        books = books.filter(read_status=Book.ReadStatus.FINISHED)
+
+    books = books.order_by("-released_on", "title")
+
+    context = {
+        "books": books,
+        "destinations": Book.Destination.choices,
+        "q": query,
+        "selected_destination": destination,
+        "read_only": read_only == "1",
+    }
+    return render(request, "library/book_archive.html", context)
 
 
 # --------------------------------------------------------------------------- #

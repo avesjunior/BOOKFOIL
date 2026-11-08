@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Shelves · BOOKFOIL{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">Shelves</h1>
+  <a class="btn btn-primary" href="{% url 'library:shelf_create' %}">+ Add shelf</a>
+</div>
+
+<div class="row g-3">
+  {% for shelf in shelves %}
+    <div class="col-md-4">
+      <div class="card h-100 p-3">
+        <div class="d-flex justify-content-between">
+          <h5 class="mb-1">{{ shelf.name }}</h5>
+          <span class="badge bg-secondary">{{ shelf.book_count }} book(s)</span>
+        </div>
+        {% if shelf.location %}<p class="text-muted small mb-2">{{ shelf.location }}</p>{% endif %}
+        {% if shelf.notes %}<p class="small mb-2">{{ shelf.notes }}</p>{% endif %}
+        <div class="mt-auto">
+          <a class="btn btn-sm btn-outline-secondary" href="{% url 'library:shelf_update' shelf.pk %}">Edit</a>
+          <a class="btn btn-sm btn-outline-danger" href="{% url 'library:shelf_delete' shelf.pk %}">Delete</a>
+          <a class="btn btn-sm btn-outline-primary" href="{% url 'library:book_list' %}?shelf={{ shelf.pk }}">View books</a>
+        </div>
+      </div>
+    </div>
+  {% empty %}
+    <div class="col-12"><p class="text-muted">No shelves yet. <a href="{% url 'library:shelf_create' %}">Add one.</a></p></div>
+  {% endfor %}
+</div>
+{% endblock %}
