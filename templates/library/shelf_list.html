@@ -20,6 +20,9 @@
           <a class="btn btn-sm btn-outline-secondary" href="{% url 'library:shelf_update' shelf.pk %}">Edit</a>
           <a class="btn btn-sm btn-outline-danger" href="{% url 'library:shelf_delete' shelf.pk %}">Delete</a>
           <a class="btn btn-sm btn-outline-primary" href="{% url 'library:book_list' %}?shelf={{ shelf.pk }}">View books</a>
+          {% if shelf.book_count %}
+            <a class="btn btn-sm btn-outline-warning" href="{% url 'library:shelf_release' shelf.pk %}">Release all</a>
+          {% endif %}
         </div>
       </div>
     </div>

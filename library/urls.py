@@ -28,6 +28,11 @@ urlpatterns = [
         views.book_restore,
         name="book_restore",
     ),
+    path(
+        "release/undo-batch/",
+        views.undo_last_batch_release,
+        name="undo_last_batch_release",
+    ),
 
     # Bookmark
     path(
@@ -57,6 +62,11 @@ urlpatterns = [
         "shelves/<int:pk>/delete/",
         views.shelf_delete,
         name="shelf_delete",
+    ),
+    path(
+        "shelves/<int:pk>/release/",
+        views.shelf_release,
+        name="shelf_release",
     ),
 
     # Wishlist

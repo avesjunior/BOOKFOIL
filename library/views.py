@@ -12,6 +12,7 @@ from .forms import (
     BorrowForm,
     ReleaseBookForm,
     ShelfForm,
+    ShelfReleaseForm,
     WishlistItemForm,
 )
 from .models import Book, Borrow, Shelf, WishlistItem
@@ -180,6 +181,8 @@ def book_release(request, pk):
                 "updated_at",
             ]
         )
+        # Remember this release so we can offer a one-click undo.
+        request.session["last_released_book_id"] = book.pk
         messages.success(
             request,
             f"“{book.title}” was marked as "
@@ -200,9 +203,16 @@ def book_restore(request, pk):
     book = get_object_or_404(Book, pk=pk)
     if request.method == "POST":
         book.restore()
+        # Clear any pending "undo" pointer for this book.
+        if request.session.get("last_released_book_id") == book.pk:
+            request.session.pop("last_released_book_id", None)
         messages.success(
             request, f"“{book.title}” is back in your collection."
         )
+    # Honour an explicit redirect target (e.g. the undo button on a list).
+    nxt = request.POST.get("next") or request.GET.get("next")
+    if nxt:
+        return redirect(nxt)
     return redirect(book.get_absolute_url())
 
 
@@ -238,6 +248,81 @@ def book_archive(request):
         "read_only": read_only == "1",
     }
     return render(request, "library/book_archive.html", context)
+
+
+def shelf_release(request, pk):
+    """
+    Release every active book on a shelf in one go (e.g. donate a whole
+    shelf). Shows a confirmation list before anything changes.
+    """
+    shelf = get_object_or_404(Shelf, pk=pk)
+    books = shelf.books.filter(status=Book.Status.ACTIVE).order_by("title")
+
+    # Books currently lent out can't be released — surface them separately.
+    releasable = [b for b in books if not b.is_borrowed_out]
+    lent_out = [b for b in books if b.is_borrowed_out]
+
+    form = ShelfReleaseForm(request.POST or None)
+
+    if request.method == "POST" and form.is_valid():
+        if not releasable:
+            messages.warning(
+                request,
+                f"No releasable books on “{shelf.name}”.",
+            )
+            return redirect("library:shelf_list")
+
+        cd = form.cleaned_data
+        released_ids = []
+        for book in releasable:
+            book.release(
+                destination=cd["destination"],
+                detail=cd["destination_detail"],
+                note=cd["destination_note"],
+                when=cd["released_on"],
+            )
+            released_ids.append(book.pk)
+
+        # Remember the batch so it can be undone in one click.
+        request.session["last_released_batch"] = released_ids
+        messages.success(
+            request,
+            f"Released {len(released_ids)} book(s) from “{shelf.name}” "
+            f"as {dict(Book.Destination.choices)[cd['destination']].lower()}. "
+            "They're kept in your history.",
+        )
+        skipped = len(lent_out)
+        if skipped:
+            messages.info(
+                request,
+                f"{skipped} book(s) were skipped because they're lent out.",
+            )
+        return redirect("library:book_archive")
+
+    context = {
+        "shelf": shelf,
+        "form": form,
+        "releasable": releasable,
+        "lent_out": lent_out,
+    }
+    return render(request, "library/shelf_release_form.html", context)
+
+
+def undo_last_batch_release(request):
+    """Restore the most recently bulk-released set of books."""
+    ids = request.session.get("last_released_batch") or []
+    if request.method == "POST" and ids:
+        restored = 0
+        for book in Book.objects.filter(pk__in=ids):
+            book.restore()
+            restored += 1
+        request.session.pop("last_released_batch", None)
+        messages.success(
+            request,
+            f"Undone — {restored} book(s) returned to your collection.",
+        )
+    nxt = request.POST.get("next") or request.GET.get("next")
+    return redirect(nxt or "library:book_archive")
 
 
 # --------------------------------------------------------------------------- #

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Release shelf · {{ shelf.name }}{% endblock %}
+{% block content %}
+<h1 class="h4 mb-1">📤 Release a whole shelf</h1>
+<p class="text-muted">
+  Shelf <strong>{{ shelf.name }}</strong>
+  {% if shelf.location %}<span class="text-muted">· {{ shelf.location }}</span>{% endif %}
+</p>
+
+<div class="alert alert-warning">
+  This will move <strong>{{ releasable|length }}</strong> book(s) out of your
+  collection into <a href="{% url 'library:book_archive' %}">history</a> with
+  the same destination. Nothing is deleted — you can undo it right after.
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header">Books that will be released ({{ releasable|length }})</div>
+      <ul class="list-group list-group-flush">
+        {% for book in releasable %}
+          <li class="list-group-item d-flex justify-content-between">
+            <span>
+              <a href="{% url 'library:book_detail' book.pk %}">{{ book.title }}</a>
+              {% if book.author %}<span class="text-muted"> — {{ book.author }}</span>{% endif %}
+            </span>
+            {% if book.was_read %}<span class="badge bg-success">read</span>{% endif %}
+          </li>
+        {% empty %}
+          <li class="list-group-item text-muted">No releasable books on this shelf.</li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    {% if lent_out %}
+      <div class="card mt-3 border-warning">
+        <div class="card-header bg-warning-subtle">
+          Skipped — currently lent out ({{ lent_out|length }})
+        </div>
+        <ul class="list-group list-group-flush">
+          {% for book in lent_out %}
+            <li class="list-group-item">
+              <a href="{% url 'library:book_detail' book.pk %}">{{ book.title }}</a>
+              <span class="text-muted small">— return it first to release it</span>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="col-lg-5">
+    <form method="post" novalidate class="card p-4">
+      {% csrf_token %}
+      {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+      <div class="mb-3">{{ form.destination.label_tag }}{{ form.destination }}{{ form.destination.errors }}</div>
+      <div class="mb-3">{{ form.released_on.label_tag }}{{ form.released_on }}{{ form.released_on.errors }}</div>
+      <div class="mb-3">{{ form.destination_detail.label_tag }}{{ form.destination_detail }}{{ form.destination_detail.errors }}</div>
+      <div class="mb-3">{{ form.destination_note.label_tag }}{{ form.destination_note }}{{ form.destination_note.errors }}</div>
+      <div class="form-check mb-3">
+        {{ form.confirm }} {{ form.confirm.label_tag }}{{ form.confirm.errors }}
+      </div>
+      <button class="btn btn-warning" {% if not releasable %}disabled{% endif %}>
+        Release {{ releasable|length }} book(s)
+      </button>
+      <a class="btn btn-link" href="{% url 'library:shelf_list' %}">Cancel</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

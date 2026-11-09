@@ -145,6 +145,11 @@ class ReleaseBookForm(_BootstrapMixin, forms.ModelForm):
     (donated, gifted, sold, lost, etc.). The book is kept for history.
     """
 
+    confirm = forms.BooleanField(
+        required=True,
+        label="Yes, move this book to history.",
+    )
+
     class Meta:
         model = Book
         fields = [
@@ -170,4 +175,41 @@ class ReleaseBookForm(_BootstrapMixin, forms.ModelForm):
             ("", "— choose —")
         ] + list(Book.Destination.choices)
         if not self.instance.released_on:
+            self.fields["released_on"].initial = timezone.localdate()
+
+
+class ShelfReleaseForm(_BootstrapMixin, forms.Form):
+    """
+    Release every active book on a shelf at once (e.g. donate a whole
+    shelf). Not a ModelForm — it writes the same destination fields to
+    many books.
+    """
+
+    destination = forms.ChoiceField(
+        choices=[("", "— choose —")] + list(Book.Destination.choices),
+        required=True,
+    )
+    destination_detail = forms.CharField(
+        max_length=200,
+        required=False,
+        label="Recipient / where it went",
+        help_text="Applied to every book on the shelf.",
+    )
+    released_on = forms.DateField(
+        required=True,
+        widget=forms.DateInput(attrs={"type": "date"}),
+    )
+    destination_note = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 2}),
+        label="Note",
+    )
+    confirm = forms.BooleanField(
+        required=True,
+        label="I understand these books will move to history.",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not self.is_bound:
             self.fields["released_on"].initial = timezone.localdate()

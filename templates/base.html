@@ -64,6 +64,26 @@
     {% endfor %}
   {% endif %}
 
+  {% if undo_book %}
+    <div class="alert alert-light border d-flex justify-content-between align-items-center">
+      <span>↩️ Just released <strong>{{ undo_book.title }}</strong>. Changed your mind?</span>
+      <form method="post" action="{% url 'library:book_restore' undo_book.pk %}">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <button class="btn btn-sm btn-outline-primary">Undo release</button>
+      </form>
+    </div>
+  {% elif undo_batch_count %}
+    <div class="alert alert-light border d-flex justify-content-between align-items-center">
+      <span>↩️ Just released <strong>{{ undo_batch_count }}</strong> book(s) from a shelf.</span>
+      <form method="post" action="{% url 'library:undo_last_batch_release' %}">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <button class="btn btn-sm btn-outline-primary">Undo release</button>
+      </form>
+    </div>
+  {% endif %}
+
   {% block content %}{% endblock %}
 </div>
 
