@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Wishlist · BOOKFOIL{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">Wishlist</h1>
+  <a class="btn btn-primary" href="{% url 'library:wishlist_create' %}">+ Add wish</a>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr><th>Title</th><th>Author</th><th>Format</th><th>Priority</th><th>Link</th><th>Status</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+          <tr class="{% if item.acquired %}table-success{% endif %}">
+            <td>{{ item.title }}</td>
+            <td class="text-muted">{{ item.author|default:"—" }}</td>
+            <td>{{ item.get_desired_format_display }}</td>
+            <td>
+              {% if item.priority == 3 %}<span class="badge bg-danger">High</span>
+              {% elif item.priority == 2 %}<span class="badge bg-warning text-dark">Medium</span>
+              {% else %}<span class="badge bg-secondary">Low</span>{% endif %}
+            </td>
+            <td>{% if item.url %}<a href="{{ item.url }}" target="_blank" rel="noopener">open</a>{% else %}—{% endif %}</td>
+            <td>
+              {% if item.acquired %}<span class="badge bg-success">Acquired</span>
+              {% else %}<span class="badge bg-light text-dark border">Wanted</span>{% endif %}
+            </td>
+            <td class="text-end">
+              <form method="post" action="{% url 'library:wishlist_toggle' item.pk %}" class="d-inline">
+                {% csrf_token %}
+                <button class="btn btn-sm btn-outline-success">
+                  {% if item.acquired %}Mark wanted{% else %}Mark acquired{% endif %}
+                </button>
+              </form>
+              <a class="btn btn-sm btn-outline-secondary" href="{% url 'library:wishlist_update' item.pk %}">Edit</a>
+              <a class="btn btn-sm btn-outline-danger" href="{% url 'library:wishlist_delete' item.pk %}">Delete</a>
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="7" class="text-center text-muted py-4">Your wishlist is empty. <a href="{% url 'library:wishlist_create' %}">Add a book you want.</a></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

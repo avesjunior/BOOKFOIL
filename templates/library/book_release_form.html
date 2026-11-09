@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Release · {{ book.title }}{% endblock %}
+{% block content %}
+<h1 class="h4 mb-1">📤 Give away / release this book</h1>
+<p class="text-muted">Review the details, then confirm to move it to history.</p>
+
+<div class="alert alert-info">
+  Releasing records where the book went (donated, gifted, sold…) and moves it
+  out of your active list. It stays in your
+  <a href="{% url 'library:book_archive' %}">history</a> — nothing is deleted,
+  and you can restore it anytime.
+</div>
+
+<div class="card p-3 mb-3">
+  <div class="d-flex">
+    {% if book.cover_url %}
+      <img src="{{ book.cover_url }}" class="book-cover-sm me-3" alt="">
+    {% endif %}
+    <div>
+      <strong>{{ book.title }}</strong>
+      {% if book.author %}<span class="text-muted"> — {{ book.author }}</span>{% endif %}
+      <div class="small text-muted mt-1">
+        {{ book.get_book_format_display }} ·
+        {{ book.location_label }} ·
+        {{ book.get_read_status_display }}
+        {% if book.was_read %}<span class="badge bg-success ms-1">already read</span>{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<form method="post" novalidate class="card p-4" style="max-width:620px;">
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+  <div class="row g-3">
+    <div class="col-md-6">{{ form.destination.label_tag }}{{ form.destination }}{{ form.destination.errors }}</div>
+    <div class="col-md-6">{{ form.released_on.label_tag }}{{ form.released_on }}{{ form.released_on.errors }}</div>
+    <div class="col-12">{{ form.destination_detail.label_tag }}{{ form.destination_detail }}{{ form.destination_detail.errors }}
+      <div class="form-text">e.g. “Maria (cousin)” or “City library”.</div></div>
+    <div class="col-12">{{ form.destination_note.label_tag }}{{ form.destination_note }}{{ form.destination_note.errors }}</div>
+    <div class="col-12 form-check ms-2 mt-2">
+      {{ form.confirm }} {{ form.confirm.label_tag }}
+      {{ form.confirm.errors }}
+    </div>
+  </div>
+  <div class="mt-4">
+    <button class="btn btn-warning">Release &amp; move to history</button>
+    <a class="btn btn-link" href="{% url 'library:book_detail' book.pk %}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

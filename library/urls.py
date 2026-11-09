@@ -16,6 +16,24 @@ urlpatterns = [
     path("books/<int:pk>/edit/", views.book_update, name="book_update"),
     path("books/<int:pk>/delete/", views.book_delete, name="book_delete"),
 
+    # Destination / history
+    path("archive/", views.book_archive, name="book_archive"),
+    path(
+        "books/<int:pk>/release/",
+        views.book_release,
+        name="book_release",
+    ),
+    path(
+        "books/<int:pk>/restore/",
+        views.book_restore,
+        name="book_restore",
+    ),
+    path(
+        "release/undo-batch/",
+        views.undo_last_batch_release,
+        name="undo_last_batch_release",
+    ),
+
     # Bookmark
     path(
         "books/<int:pk>/bookmark/",
@@ -44,6 +62,11 @@ urlpatterns = [
         "shelves/<int:pk>/delete/",
         views.shelf_delete,
         name="shelf_delete",
+    ),
+    path(
+        "shelves/<int:pk>/release/",
+        views.shelf_release,
+        name="shelf_release",
     ),
 
     # Wishlist

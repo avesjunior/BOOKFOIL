@@ -10,7 +10,9 @@ from .forms import (
     BookForm,
     BookmarkForm,
     BorrowForm,
+    ReleaseBookForm,
     ShelfForm,
+    ShelfReleaseForm,
     WishlistItemForm,
 )
 from .models import Book, Borrow, Shelf, WishlistItem
@@ -31,15 +33,19 @@ def dashboard(request):
         b for b in active_borrows if 0 <= b.days_until_due <= 7
     ]
     context = {
-        "book_count": Book.objects.count(),
+        "book_count": Book.objects.filter(status=Book.Status.ACTIVE).count(),
         "shelf_count": Shelf.objects.count(),
         "reading": Book.objects.filter(
-            read_status=Book.ReadStatus.READING
+            status=Book.Status.ACTIVE,
+            read_status=Book.ReadStatus.READING,
         ).order_by("title"),
         "active_borrows": active_borrows,
         "overdue": overdue,
         "due_soon": due_soon,
         "wishlist_open": WishlistItem.objects.filter(acquired=False).count(),
+        "released_count": Book.objects.filter(
+            status=Book.Status.RELEASED
+        ).count(),
         "today": today,
     }
     return render(request, "library/dashboard.html", context)
@@ -49,7 +55,11 @@ def dashboard(request):
 # Book CRUD
 # --------------------------------------------------------------------------- #
 def book_list(request):
-    books = Book.objects.select_related("shelf").all()
+    # The main list shows books still in your collection. Released books
+    # (donated, gifted, etc.) move to the archive/history view.
+    books = Book.objects.select_related("shelf").filter(
+        status=Book.Status.ACTIVE
+    )
 
     query = request.GET.get("q", "").strip()
     fmt = request.GET.get("format", "").strip()
@@ -135,6 +145,184 @@ def book_delete(request, pk):
         "object_label": f"book “{book.title}”",
         "cancel_url": book.get_absolute_url(),
     })
+
+
+# --------------------------------------------------------------------------- #
+# Destination — release a book (donate/gift/…), archive & restore
+# --------------------------------------------------------------------------- #
+def book_release(request, pk):
+    """Record where a book went and move it out of the active collection."""
+    book = get_object_or_404(Book, pk=pk)
+
+    if book.is_released:
+        messages.info(request, f"“{book.title}” has already been released.")
+        return redirect(book.get_absolute_url())
+
+    if book.is_borrowed_out:
+        messages.warning(
+            request,
+            f"“{book.title}” is currently lent to "
+            f"{book.active_borrow.borrower_name}. Mark it returned before "
+            "releasing it.",
+        )
+        return redirect(book.get_absolute_url())
+
+    form = ReleaseBookForm(request.POST or None, instance=book)
+    if request.method == "POST" and form.is_valid():
+        book = form.save(commit=False)
+        book.status = Book.Status.RELEASED
+        book.save(
+            update_fields=[
+                "status",
+                "destination",
+                "destination_detail",
+                "released_on",
+                "destination_note",
+                "updated_at",
+            ]
+        )
+        # Remember this release so we can offer a one-click undo.
+        request.session["last_released_book_id"] = book.pk
+        messages.success(
+            request,
+            f"“{book.title}” was marked as "
+            f"{book.get_destination_display().lower()} and moved to your "
+            "history. It's kept for the record.",
+        )
+        return redirect(book.get_absolute_url())
+
+    return render(
+        request,
+        "library/book_release_form.html",
+        {"form": form, "book": book},
+    )
+
+
+def book_restore(request, pk):
+    """Bring a released book back into the active collection."""
+    book = get_object_or_404(Book, pk=pk)
+    if request.method == "POST":
+        book.restore()
+        # Clear any pending "undo" pointer for this book.
+        if request.session.get("last_released_book_id") == book.pk:
+            request.session.pop("last_released_book_id", None)
+        messages.success(
+            request, f"“{book.title}” is back in your collection."
+        )
+    # Honour an explicit redirect target (e.g. the undo button on a list).
+    nxt = request.POST.get("next") or request.GET.get("next")
+    if nxt:
+        return redirect(nxt)
+    return redirect(book.get_absolute_url())
+
+
+def book_archive(request):
+    """History of books that have left the collection (incl. already read)."""
+    books = Book.objects.select_related("shelf").filter(
+        status=Book.Status.RELEASED
+    )
+
+    query = request.GET.get("q", "").strip()
+    destination = request.GET.get("destination", "").strip()
+    read_only = request.GET.get("read", "").strip()  # "1" => only finished
+
+    if query:
+        books = books.filter(
+            Q(title__icontains=query)
+            | Q(author__icontains=query)
+            | Q(isbn__icontains=query)
+            | Q(destination_detail__icontains=query)
+        )
+    if destination in dict(Book.Destination.choices):
+        books = books.filter(destination=destination)
+    if read_only == "1":
+        books = books.filter(read_status=Book.ReadStatus.FINISHED)
+
+    books = books.order_by("-released_on", "title")
+
+    context = {
+        "books": books,
+        "destinations": Book.Destination.choices,
+        "q": query,
+        "selected_destination": destination,
+        "read_only": read_only == "1",
+    }
+    return render(request, "library/book_archive.html", context)
+
+
+def shelf_release(request, pk):
+    """
+    Release every active book on a shelf in one go (e.g. donate a whole
+    shelf). Shows a confirmation list before anything changes.
+    """
+    shelf = get_object_or_404(Shelf, pk=pk)
+    books = shelf.books.filter(status=Book.Status.ACTIVE).order_by("title")
+
+    # Books currently lent out can't be released — surface them separately.
+    releasable = [b for b in books if not b.is_borrowed_out]
+    lent_out = [b for b in books if b.is_borrowed_out]
+
+    form = ShelfReleaseForm(request.POST or None)
+
+    if request.method == "POST" and form.is_valid():
+        if not releasable:
+            messages.warning(
+                request,
+                f"No releasable books on “{shelf.name}”.",
+            )
+            return redirect("library:shelf_list")
+
+        cd = form.cleaned_data
+        released_ids = []
+        for book in releasable:
+            book.release(
+                destination=cd["destination"],
+                detail=cd["destination_detail"],
+                note=cd["destination_note"],
+                when=cd["released_on"],
+            )
+            released_ids.append(book.pk)
+
+        # Remember the batch so it can be undone in one click.
+        request.session["last_released_batch"] = released_ids
+        messages.success(
+            request,
+            f"Released {len(released_ids)} book(s) from “{shelf.name}” "
+            f"as {dict(Book.Destination.choices)[cd['destination']].lower()}. "
+            "They're kept in your history.",
+        )
+        skipped = len(lent_out)
+        if skipped:
+            messages.info(
+                request,
+                f"{skipped} book(s) were skipped because they're lent out.",
+            )
+        return redirect("library:book_archive")
+
+    context = {
+        "shelf": shelf,
+        "form": form,
+        "releasable": releasable,
+        "lent_out": lent_out,
+    }
+    return render(request, "library/shelf_release_form.html", context)
+
+
+def undo_last_batch_release(request):
+    """Restore the most recently bulk-released set of books."""
+    ids = request.session.get("last_released_batch") or []
+    if request.method == "POST" and ids:
+        restored = 0
+        for book in Book.objects.filter(pk__in=ids):
+            book.restore()
+            restored += 1
+        request.session.pop("last_released_batch", None)
+        messages.success(
+            request,
+            f"Undone — {restored} book(s) returned to your collection.",
+        )
+    nxt = request.POST.get("next") or request.GET.get("next")
+    return redirect(nxt or "library:book_archive")
 
 
 # --------------------------------------------------------------------------- #

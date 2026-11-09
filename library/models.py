@@ -37,7 +37,8 @@ class Shelf(models.Model):
 
     @property
     def book_count(self) -> int:
-        return self.books.count()
+        """Active books currently on this shelf (released ones excluded)."""
+        return self.books.filter(status=Book.Status.ACTIVE).count()
 
 
 class Book(models.Model):
@@ -52,6 +53,18 @@ class Book(models.Model):
         READING = "reading", "Currently reading"
         FINISHED = "finished", "Finished"
         ABANDONED = "abandoned", "Abandoned"
+
+    class Status(models.TextChoices):
+        ACTIVE = "active", "In collection"
+        RELEASED = "released", "Released (left the collection)"
+
+    class Destination(models.TextChoices):
+        DONATED = "donated", "Donated"
+        GIFTED = "gifted", "Gifted to someone"
+        SOLD = "sold", "Sold"
+        LOST = "lost", "Lost"
+        DISCARDED = "discarded", "Discarded"
+        OTHER = "other", "Other"
 
     # --- Core bibliographic fields ---
     title = models.CharField(max_length=255)
@@ -103,6 +116,32 @@ class Book(models.Model):
         "e.g. 'Amazon (jane@…)' or 'Google Play Books'.",
     )
 
+    # --- Destination / release ---
+    # A released book leaves the active list but is kept for history.
+    status = models.CharField(
+        max_length=10,
+        choices=Status.choices,
+        default=Status.ACTIVE,
+    )
+    destination = models.CharField(
+        max_length=12,
+        choices=Destination.choices,
+        blank=True,
+        help_text="Where the book went when it left your collection.",
+    )
+    destination_detail = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="Who received it / where it went, "
+        "e.g. 'Gifted to Maria' or 'Local library'.",
+    )
+    released_on = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Date the book left your collection.",
+    )
+    destination_note = models.TextField(blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -150,6 +189,72 @@ class Book(models.Model):
         if not bm or not self.total_pages:
             return None
         return min(100, round((bm.current_page / self.total_pages) * 100))
+
+    # --- Destination / release helpers ---
+    @property
+    def is_active(self) -> bool:
+        return self.status == self.Status.ACTIVE
+
+    @property
+    def is_released(self) -> bool:
+        return self.status == self.Status.RELEASED
+
+    @property
+    def was_read(self) -> bool:
+        """True if the book was finished at some point."""
+        return self.read_status == self.ReadStatus.FINISHED
+
+    @property
+    def destination_label(self) -> str:
+        """Human readable 'where did it go' string."""
+        if not self.is_released:
+            return ""
+        label = self.get_destination_display() if self.destination else "Released"
+        if self.destination_detail:
+            return f"{label} — {self.destination_detail}"
+        return label
+
+    def release(
+        self,
+        destination: str,
+        detail: str = "",
+        note: str = "",
+        when=None,
+    ) -> None:
+        """Mark the book as having left the collection, kept for history."""
+        self.status = self.Status.RELEASED
+        self.destination = destination
+        self.destination_detail = detail
+        self.destination_note = note
+        self.released_on = when or timezone.localdate()
+        self.save(
+            update_fields=[
+                "status",
+                "destination",
+                "destination_detail",
+                "destination_note",
+                "released_on",
+                "updated_at",
+            ]
+        )
+
+    def restore(self) -> None:
+        """Bring a released book back into the active collection."""
+        self.status = self.Status.ACTIVE
+        self.destination = ""
+        self.destination_detail = ""
+        self.destination_note = ""
+        self.released_on = None
+        self.save(
+            update_fields=[
+                "status",
+                "destination",
+                "destination_detail",
+                "destination_note",
+                "released_on",
+                "updated_at",
+            ]
+        )
 
 
 class Bookmark(models.Model):

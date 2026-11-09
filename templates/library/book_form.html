@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} · BOOKFOIL{% endblock %}
+{% block content %}
+<h1 class="h3 mb-3">{{ title }}</h1>
+
+<form method="post" novalidate>
+  {% csrf_token %}
+  <div class="card p-4">
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <h5 class="text-muted mb-3">Details</h5>
+    <div class="row g-3">
+      <div class="col-md-8">{{ form.title.label_tag }}{{ form.title }}{{ form.title.errors }}</div>
+      <div class="col-md-4">{{ form.author.label_tag }}{{ form.author }}{{ form.author.errors }}</div>
+      <div class="col-md-4">{{ form.isbn.label_tag }}{{ form.isbn }}{{ form.isbn.errors }}</div>
+      <div class="col-md-4">{{ form.publisher.label_tag }}{{ form.publisher }}{{ form.publisher.errors }}</div>
+      <div class="col-md-2">{{ form.published_year.label_tag }}{{ form.published_year }}{{ form.published_year.errors }}</div>
+      <div class="col-md-2">{{ form.total_pages.label_tag }}{{ form.total_pages }}{{ form.total_pages.errors }}</div>
+      <div class="col-md-4">{{ form.genre.label_tag }}{{ form.genre }}{{ form.genre.errors }}</div>
+      <div class="col-md-4">{{ form.read_status.label_tag }}{{ form.read_status }}{{ form.read_status.errors }}</div>
+      <div class="col-md-4">{{ form.cover_url.label_tag }}{{ form.cover_url }}{{ form.cover_url.errors }}</div>
+    </div>
+
+    <h5 class="text-muted mt-4 mb-3">Format &amp; location</h5>
+    <div class="row g-3">
+      <div class="col-md-4">{{ form.book_format.label_tag }}{{ form.book_format }}{{ form.book_format.errors }}</div>
+      <div class="col-md-4">{{ form.shelf.label_tag }}{{ form.shelf }}{{ form.shelf.errors }}
+        <div class="form-text">For physical books.</div></div>
+    </div>
+    <div class="row g-3 mt-0">
+      <div class="col-md-6">{{ form.digital_device.label_tag }}{{ form.digital_device }}{{ form.digital_device.errors }}
+        <div class="form-text">For digital books — e.g. Kindle, iPad.</div></div>
+      <div class="col-md-6">{{ form.digital_account.label_tag }}{{ form.digital_account }}{{ form.digital_account.errors }}
+        <div class="form-text">For digital books — e.g. Amazon account.</div></div>
+    </div>
+
+    <h5 class="text-muted mt-4 mb-3">Notes</h5>
+    <div>{{ form.notes }}{{ form.notes.errors }}</div>
+
+    <div class="mt-4">
+      <button class="btn btn-primary">Save</button>
+      {% if book %}
+        <a class="btn btn-link" href="{% url 'library:book_detail' book.pk %}">Cancel</a>
+      {% else %}
+        <a class="btn btn-link" href="{% url 'library:book_list' %}">Cancel</a>
+      {% endif %}
+    </div>
+  </div>
+</form>
+
+<script>
+  // Show/hide shelf vs device/account based on the chosen format.
+  (function () {
+    const fmt = document.getElementById("id_book_format");
+    if (!fmt) return;
+    const shelfRow = document.getElementById("id_shelf").closest(".col-md-4");
+    const deviceRow = document.getElementById("id_digital_device").closest(".row");
+    function sync() {
+      const digital = fmt.value === "digital";
+      shelfRow.style.opacity = digital ? ".45" : "1";
+      deviceRow.style.opacity = digital ? "1" : ".45";
+    }
+    fmt.addEventListener("change", sync);
+    sync();
+  })();
+</script>
+{% endblock %}

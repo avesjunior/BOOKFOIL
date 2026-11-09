@@ -38,6 +38,7 @@ source .venv/bin/activate         # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
 # 3. Create the local database
+python manage.py makemigrations library
 python manage.py migrate
 
 # 4. (Optional) create an admin user for /admin/
